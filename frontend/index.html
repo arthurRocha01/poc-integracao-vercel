@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRUD · Supabase</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Ícones Phosphor -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════
+       TOAST / NOTIFICAÇÃO
+  ═══════════════════════════════════════════ -->
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <!-- ═══════════════════════════════════════════
+       MODAL DE CONFIRMAÇÃO DE DELETE
+  ═══════════════════════════════════════════ -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-icon"><i class="ph ph-warning"></i></div>
+      <h3>Excluir registro?</h3>
+      <p>Esta ação não pode ser desfeita.</p>
+      <div class="modal-actions">
+        <button id="btn-cancel-delete" class="btn btn-ghost">Cancelar</button>
+        <button id="btn-confirm-delete" class="btn btn-danger">Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       CABEÇALHO
+  ═══════════════════════════════════════════ -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-dot"></span>
+        <span class="logo-text">DataHub</span>
+      </div>
+      <div class="header-meta">
+        <span id="record-count" class="badge">0 registros</span>
+        <div id="connection-status" class="conn-status offline" title="Status da conexão">
+          <span class="conn-dot"></span>
+          <span class="conn-label">offline</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════
+       CONTEÚDO PRINCIPAL
+  ═══════════════════════════════════════════ -->
+  <main class="main-content">
+
+    <!-- ── PAINEL DO FORMULÁRIO ── -->
+    <section class="form-panel" id="form-panel">
+      <div class="panel-header">
+        <h2 id="form-title"><i class="ph ph-plus-circle"></i> Novo Registro</h2>
+        <button id="btn-toggle-form" class="btn btn-ghost icon-btn" title="Recolher formulário">
+          <i class="ph ph-caret-up"></i>
+        </button>
+      </div>
+
+      <form id="main-form" novalidate>
+        <!-- ID oculto para edição -->
+        <input type="hidden" id="field-id" />
+
+        <div class="form-grid">
+          <!-- Nome -->
+          <div class="form-group">
+            <label for="field-nome">Nome <span class="required">*</span></label>
+            <div class="input-wrap">
+              <i class="ph ph-user input-icon"></i>
+              <input type="text" id="field-nome" placeholder="Nome completo" autocomplete="off" />
+            </div>
+            <span class="field-error" id="err-nome"></span>
+          </div>
+
+          <!-- E-mail -->
+          <div class="form-group">
+            <label for="field-email">E-mail <span class="required">*</span></label>
+            <div class="input-wrap">
+              <i class="ph ph-envelope input-icon"></i>
+              <input type="email" id="field-email" placeholder="exemplo@email.com" autocomplete="off" />
+            </div>
+            <span class="field-error" id="err-email"></span>
+          </div>
+
+          <!-- Senha -->
+          <div class="form-group">
+            <label for="field-senha">Senha <span class="required">*</span></label>
+            <div class="input-wrap">
+              <i class="ph ph-lock input-icon"></i>
+              <input type="password" id="field-senha" placeholder="Mínimo 6 caracteres" autocomplete="new-password" />
+              <button type="button" class="toggle-pwd" id="toggle-senha" tabindex="-1" title="Mostrar/ocultar senha">
+                <i class="ph ph-eye" id="eye-senha"></i>
+              </button>
+            </div>
+            <span class="field-error" id="err-senha"></span>
+          </div>
+
+          <!-- Confirmar Senha -->
+          <div class="form-group" id="group-confirma">
+            <label for="field-confirma">Confirmar Senha <span class="required">*</span></label>
+            <div class="input-wrap">
+              <i class="ph ph-lock-key input-icon"></i>
+              <input type="password" id="field-confirma" placeholder="Repita a senha" autocomplete="new-password" />
+              <button type="button" class="toggle-pwd" id="toggle-confirma" tabindex="-1" title="Mostrar/ocultar senha">
+                <i class="ph ph-eye" id="eye-confirma"></i>
+              </button>
+            </div>
+            <span class="field-error" id="err-confirma"></span>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" id="btn-cancel-edit" class="btn btn-ghost hidden">
+            <i class="ph ph-x"></i> Cancelar
+          </button>
+          <button type="submit" id="btn-submit" class="btn btn-primary">
+            <i class="ph ph-floppy-disk"></i>
+            <span id="btn-submit-label">Salvar</span>
+            <span id="btn-loader" class="btn-loader hidden"></span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ── PAINEL DA TABELA ── -->
+    <section class="table-panel">
+      <div class="panel-header">
+        <h2><i class="ph ph-table"></i> Registros</h2>
+        <div class="table-controls">
+          <div class="search-wrap">
+            <i class="ph ph-magnifying-glass"></i>
+            <input type="search" id="search-input" placeholder="Filtrar por nome ou e-mail…" />
+          </div>
+          <button id="btn-refresh" class="btn btn-ghost icon-btn" title="Recarregar">
+            <i class="ph ph-arrows-clockwise"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Estado de carregamento -->
+      <div id="table-loader" class="table-loader">
+        <div class="spinner"></div>
+        <p>Buscando dados…</p>
+      </div>
+
+      <!-- Estado vazio -->
+      <div id="table-empty" class="table-empty hidden">
+        <i class="ph ph-folder-open"></i>
+        <p>Nenhum registro encontrado.</p>
+      </div>
+
+      <!-- Tabela -->
+      <div class="table-wrapper" id="table-wrapper">
+        <table id="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nome</th>
+              <th>E-mail</th>
+              <th>Senha</th>
+              <th>Criado em</th>
+              <th class="col-actions">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <!-- Linhas geradas pelo JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
