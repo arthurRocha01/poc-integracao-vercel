@@ -15,6 +15,7 @@ export const create = async (req, res) => {
     const { error, data } = await userModel.create(name, email, password);
 
     if (error) {
+        console.log(`error: ${error.message}`)
         return res.status(400).json({ error: error.message});
     }
 
