@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   API E FETCH
+   CONFIGURAÇÃO E API
    ═══════════════════════════════════════════════════════════ */
 const API_URL = 'http://localhost:3030/api';
 
@@ -22,20 +22,33 @@ async function apiFetch(path, method = 'GET', body = null) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   ESTADO E DOM
+   ESTADO E MAPEAMENTO DO DOM
    ═══════════════════════════════════════════════════════════ */
 let allRecords = [];
 
+// Formulário e Campos
 const form = document.getElementById('main-form');
+const btnSubmit = document.getElementById('btn-submit');
+const btnLoader = document.getElementById('btn-loader');
+const btnLabel = document.getElementById('btn-submit-label');
+
 const fieldName = document.getElementById('field-nome');
 const fieldEmail = document.getElementById('field-email');
 const fieldPassword = document.getElementById('field-senha');
 const fieldConfirmPassword = document.getElementById('field-confirm-password');
 
+// Tabela e Estados de Carregamento
 const tableBody = document.getElementById('table-body');
+const tableLoader = document.getElementById('table-loader');
+const tableEmpty = document.getElementById('table-empty');
+const tableWrapper = document.getElementById('table-wrapper');
+
+// UI Geral
 const searchInput = document.getElementById('search-input');
 const btnRefresh = document.getElementById('btn-refresh');
 const toast = document.getElementById('toast');
+const recordCountBadge = document.getElementById('record-count');
+const connStatus = document.getElementById('connection-status');
 
 /* ═══════════════════════════════════════════════════════════
    UTILITÁRIOS
@@ -46,42 +59,76 @@ function showToast(message, type = 'info') {
   setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-const createRecord = (data) => apiFetch('/users', 'POST', data);
+// Alternar visibilidade da senha
+function setupPasswordToggle(buttonId, inputId, iconId) {
+  const btn = document.getElementById(buttonId);
+  const input = document.getElementById(inputId);
+  const icon = document.getElementById(iconId);
+
+  btn.addEventListener('click', () => {
+    const isPwd = input.type === 'password';
+    input.type = isPwd ? 'text' : 'password';
+    icon.className = isPwd ? 'ph ph-eye-slash' : 'ph ph-eye';
+  });
+}
+
+setupPasswordToggle('toggle-senha', 'field-senha', 'eye-senha');
+setupPasswordToggle('toggle-confirma', 'field-confirm-password', 'eye-confirma');
 
 /* ═══════════════════════════════════════════════════════════
-   CARREGAR E RENDERIZAR TABELA
+   LÓGICA DE DADOS (CRUD)
    ═══════════════════════════════════════════════════════════ */
+
 async function loadRecords() {
+  // Mostra loader e esconde tabela/vazio
+  tableLoader.classList.remove('hidden');
+  tableWrapper.classList.add('hidden');
+  tableEmpty.classList.add('hidden');
+
   try {
     const data = await apiFetch('/users');
     allRecords = data.data || data;
+
+    // Atualiza status para online
+    connStatus.classList.replace('offline', 'online');
+    connStatus.querySelector('.conn-label').textContent = 'online';
+
     renderTable(allRecords);
   } catch (err) {
     console.error(err);
-    showToast('Erro ao carregar usuários', 'error');
+    showToast('Erro ao conectar com a API', 'error');
+    
+    // Em caso de erro, remove loader e marca offline
+    tableLoader.classList.add('hidden');
+    connStatus.classList.replace('online', 'offline');
+    connStatus.querySelector('.conn-label').textContent = 'offline';
   }
 }
 
 function renderTable(records) {
   tableBody.innerHTML = '';
+  tableLoader.classList.add('hidden'); // Esconde o loader infinito
 
-  if (!records.length) {
-    tableBody.innerHTML = `<tr><td colspan="4" style="text-align: center;">Nenhum registro encontrado</td></tr>`;
+  // Atualiza badge de contagem
+  recordCountBadge.textContent = `${records.length} registro(s)`;
+
+  if (records.length === 0) {
+    tableWrapper.classList.add('hidden');
+    tableEmpty.classList.remove('hidden');
     return;
   }
 
+  tableWrapper.classList.remove('hidden');
+  tableEmpty.classList.add('hidden');
+
   records.forEach(user => {
     const tr = document.createElement('tr');
-
-    // Note que adicionei uma coluna de "******" para a senha, 
-    // já que no seu HTML tem uma coluna <th>Senha</th>.
     tr.innerHTML = `
       <td>${user.name}</td>
       <td>${user.email}</td>
-      <td>******</td> 
-      <td>${new Date(user.created_at).toLocaleDateString('pt-BR')}</td>
+      <td class="pwd-mask">••••••</td> 
+      <td class="row-date">${new Date(user.created_at).toLocaleDateString('pt-BR')}</td>
     `;
-
     tableBody.appendChild(tr);
   });
 }
@@ -89,7 +136,7 @@ function renderTable(records) {
 /* ═══════════════════════════════════════════════════════════
    EVENTOS
    ═══════════════════════════════════════════════════════════ */
-// Envio do Formulário (Apenas Criar)
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -98,25 +145,35 @@ form.addEventListener('submit', async (e) => {
   const password = fieldPassword.value;
   const confirmPassword = fieldConfirmPassword.value;
 
-  if (password && password !== confirmPassword) {
+  if (!name || !email || !password) {
+    return showToast('Preencha todos os campos obrigatórios', 'error');
+  }
+
+  if (password !== confirmPassword) {
     return showToast('As senhas não coincidem', 'error');
   }
 
-  const payload = { name, email };
-  if (password) payload.password = password;
+  // Feedback visual no botão
+  btnSubmit.disabled = true;
+  btnLoader.classList.remove('hidden');
+  btnLabel.textContent = 'Salvando...';
 
   try {
-    await createRecord(payload);
+    await apiFetch('/users', 'POST', { name, email, password });
     showToast('Usuário criado com sucesso!', 'success');
     
     form.reset();
     await loadRecords();
   } catch (err) {
     showToast(err.message, 'error');
+  } finally {
+    btnSubmit.disabled = false;
+    btnLoader.classList.add('hidden');
+    btnLabel.textContent = 'Salvar';
   }
 });
 
-// Busca/Filtro
+// Busca em tempo real
 searchInput.addEventListener('input', () => {
   const q = searchInput.value.toLowerCase();
   const filtered = allRecords.filter(u =>
@@ -126,7 +183,7 @@ searchInput.addEventListener('input', () => {
   renderTable(filtered);
 });
 
-// Atualizar Tabela
+// Botão de atualizar manual
 btnRefresh.addEventListener('click', loadRecords);
 
 // Inicialização
