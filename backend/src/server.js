@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
+// import path from 'path';
+// import { fileURLToPath } from 'url';
 import dotenv from 'dotenv/config';
 import { userRouter } from './routes/userRoutes.js';
 
@@ -17,6 +17,8 @@ app.use(cors());
 
 
 app.use('/api', userRouter);
+
+export default app;
 
 // app.get('/', (req, res) => {
 //   res.sendFile(path.join(frontendPath, 'index.html'));
