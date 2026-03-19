@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════
    CONFIGURAÇÃO E API
    ═══════════════════════════════════════════════════════════ */
-const API_URL = 'http://localhost:3030/api';
+const API_URL = '/api';
 
 async function apiFetch(path, method = 'GET', body = null) {
   const options = {
